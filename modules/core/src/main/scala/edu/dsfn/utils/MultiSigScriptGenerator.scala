@@ -1,4 +1,4 @@
-package edu.dsfn
+package edu.dsfn.utils
 
 object MultiSigScriptGenerator {
   def apply(accounts: List[String], num: Int): String = {

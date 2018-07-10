@@ -2,11 +2,10 @@ package edu.dsfn
 
 import cats.effect
 import cats.effect.{ExitCode, IO, IOApp}
-import cats.implicits._
 import com.wavesplatform.wavesj.{Base58, Node, PrivateKeyAccount}
-import edu.dsfn.config.{AppConfig, LoadConfig}
+import edu.dsfn.config.AppConfig
 import edu.dsfn.models.Request.{SetScriptRequest, TransferRequest}
-import edu.dsfn.models.{MultiSigPrecondition, Request}
+import edu.dsfn.models.{LoaderState, MultiSigPrecondition}
 import edu.dsfn.utils.{Chain, SeedWords, _}
 import eu.timepit.refined.pureconfig.refTypeConfigConvert
 import fs2._
@@ -25,41 +24,6 @@ object Main extends IOApp {
       )
   }
 
-  final case class LoaderState(config: LoadConfig, counter: Int, requestAccumulator: Stream[IO, Request], finished: Boolean) {
-    def next(msp: MultiSigPrecondition): IO[LoaderState] = {
-      val txCount  = config.initial.value + counter * config.step.value
-      val requests = mkLoadTransfers(msp, txCount)
-
-      IO.sleep(config.interval) *> IO {
-        copy(
-          counter = counter + 1,
-          requestAccumulator = requestAccumulator ++ requests,
-          finished = txCount >= config.`final`.value
-        )
-      }
-    }
-
-    private def mkLoadTransfers(msp: MultiSigPrecondition, txCount: Int): Stream[IO, Request] = {
-      val senders: Stream[IO, PrivateKeyAccount] =
-        Stream
-          .emits(msp.owners.toSeq.reverse)
-          .repeat
-
-      val recipients: Stream[IO, PrivateKeyAccount] =
-        Stream
-          .emits(msp.owners.toSeq)
-          .repeat
-
-      (senders zip recipients)
-        .map {
-          case (sender, recipient) =>
-            TransferRequest(sender, recipient, 1.waves)
-        }
-        .take(txCount)
-
-    }
-  }
-
   def run(args: List[String]): IO[effect.ExitCode] = {
 
     val configF =
@@ -73,7 +37,6 @@ object Main extends IOApp {
           val nodes = urls.map(url => NodeApi[IO](new Node(url.value)))
           Stream.emits(nodes)
         })
-        .repeat
 
     val multiSigPrecons =
       configF
@@ -104,7 +67,7 @@ object Main extends IOApp {
       configF
         .map(_.load)
         .flatMap(loadConfig => {
-          val initialState: LoaderState = LoaderState(loadConfig, 0, Stream.empty, false)
+          val initialState = LoaderState(loadConfig, 0, Stream.empty, false)
 
           multiSigPrecons
             .flatMap { msp =>
@@ -117,8 +80,8 @@ object Main extends IOApp {
             }
         })
 
-    ((initialTransfers ++ scripts ++ transfers) zip nodePool)
-      .evalMap { case (req, node) => IO { println(req) }/* node.runRequest(req) */ }
+    ((initialTransfers ++ scripts ++ transfers) zip nodePool.repeat)
+      .evalMap { case (req, node) => IO { println(req) } /* node.runRequest(req) */ }
       .compile
       .drain
       .map(_ => ExitCode.Success)
