@@ -1,20 +1,19 @@
-package edu.dsfn.loader
+package edu.dsfn
 
-import cats.Monad
-import cats.implicits._
 import cats.effect.Async
+import cats.implicits._
 import com.wavesplatform.wavesj.{Node, PrivateKeyAccount}
 import edu.dsfn.models.Request
 import edu.dsfn.models.Request.{SetScriptRequest, TransferRequest}
 import edu.dsfn.utils.{Chain, Fee}
 
 final case class NodeApi[F[_]: Async](node: Node) {
-  def setScript(script: String, account: PrivateKeyAccount): F[Unit] = {
+  private def setScript(script: String, account: PrivateKeyAccount): F[Unit] = {
     Async[F].delay {
       node.setScript(account, script, Chain.id, Fee.setScript)
     }
   }
-  def transfer(from: PrivateKeyAccount, to: String, amount: Long): F[Unit] = {
+  private def transfer(from: PrivateKeyAccount, to: String, amount: Long): F[Unit] = {
     Async[F].delay {
       node.transfer(from, to, amount, Fee.transfer, "load testing")
     }
@@ -31,7 +30,7 @@ final case class NodeApi[F[_]: Async](node: Node) {
     }
   }
 
-  def compile(src: String): F[String] = {
+  private def compile(src: String): F[String] = {
     Async[F].delay {
       node.compileScript(src)
     }
