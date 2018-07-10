@@ -1,7 +1,7 @@
 package edu.dsfn
 
 object MultiSigScriptGenerator {
-  def apply(accounts: List[String], of: Int): String = {
+  def apply(accounts: List[String], num: Int): String = {
     val accountsWithIndexes = accounts zipWithIndex
     val keyLets =
       accountsWithIndexes map {
@@ -20,7 +20,7 @@ object MultiSigScriptGenerator {
         s"accountSigned$ind"
     } mkString ("let proofSum = ", " + ", "")
 
-    val finalStatement = s"proofSum >= $of"
+    val finalStatement = s"proofSum >= $num"
 
     s"""
        |$keyLets

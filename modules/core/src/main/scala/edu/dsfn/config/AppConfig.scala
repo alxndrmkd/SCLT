@@ -1,5 +1,5 @@
 package edu.dsfn.config
 
-final case class AppConfig(accounts: Set[MultiSigConfig],
-                           load: LoadConfig,
-                           network: NetworkConfig)
+import eu.timepit.refined.types.string.NonEmptyString
+
+final case class AppConfig(faucetSeed: NonEmptyString, accounts: Set[MultiSigConfig], load: LoadConfig, network: NetworkConfig)
