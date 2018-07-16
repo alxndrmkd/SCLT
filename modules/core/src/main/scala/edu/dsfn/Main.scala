@@ -2,7 +2,7 @@ package edu.dsfn
 
 import cats.effect
 import cats.effect.{ExitCode, IO, IOApp}
-import com.wavesplatform.wavesj.{Base58, Node, PrivateKeyAccount}
+import com.wavesplatform.wavesj._
 import edu.dsfn.config.AppConfig
 import edu.dsfn.models.Request.{SetScriptRequest, TransferRequest}
 import edu.dsfn.models.{LoaderState, MultiSigPrecondition}
@@ -10,6 +10,7 @@ import edu.dsfn.utils.{Chain, SeedWords, _}
 import eu.timepit.refined.pureconfig.refTypeConfigConvert
 import fs2._
 import pureconfig.module.catseffect._
+import cats.implicits._
 
 import scala.util.Random
 
@@ -49,10 +50,14 @@ object Main extends IOApp {
 
     val initialTransfers =
       configF
-        .map(conf => createAccount(conf.faucetSeed.value))
-        .repeat
-        .zip(multiSigPrecons.map(_.account))
-        .map { case (sender, recipient) => TransferRequest(sender, recipient, 10000.waves) }
+        .map(conf => PrivateKeyAccount.fromPrivateKey(conf.faucetPrivateKey.value, Chain.id))
+        .flatMap { faucet =>
+          multiSigPrecons
+            .map(_.account)
+            .map { recipient =>
+              TransferRequest(faucet, recipient, 10000.waves)
+            }
+        }
 
     val scripts =
       multiSigPrecons
@@ -81,7 +86,7 @@ object Main extends IOApp {
         })
 
     ((initialTransfers ++ scripts ++ transfers) zip nodePool.repeat)
-      .evalMap { case (req, node) => IO { println(req) } /* node.runRequest(req) */ }
+      .evalMap { case (req, node) => node.runRequest(req) }
       .compile
       .drain
       .map(_ => ExitCode.Success)
